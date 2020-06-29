@@ -3,19 +3,20 @@
                 global          _start
 _start:
 
-                sub             rsp, 2 * 256 * 8
-                lea             rdi, [rsp + 256 * 8]
-                mov             rcx, 256
+                sub             rsp, 2 * 128 * 8
+                lea             rdi, [rsp + 128 * 8]
+                mov             rcx, 128
                 call            read_long
                 mov             rdi, rsp
                 call            read_long
-                lea             rsi, [rsp + 256 * 8]
+                lea             rsi, [rsp + 128 * 8]
 
                 sub             rsp, 256 * 8
                 mov             rbp, rsp
 
                 call            mul_long_long
 
+                mov             rcx, 256
                 mov             rdi, rbp
 
                 call            write_long
@@ -33,88 +34,91 @@ _start:
 ; result:
 ;    result of multiply is written to rbp
 mul_long_long:
+                ; clear result buffer
                 push            rdi
+                push            rcx
                 mov             rdi, rbp
+                add             rcx, rcx
                 call            set_zero
-                pop             rdi
-
-                sub             rsp, 256 * 8
-                mov             r8, rsp
-
-                push            rcx
-                push            rsi
-                push            rbp
-.loop:
-                call            copy
-
-                mov             rbx, [rsi]
-                push            rdi
-                mov             rdi, r8
-                call            mul_long_short
-                pop             rdi
-
-                push            rdi
-                push            rsi
-                mov             rdi, rbp
-                mov             rsi, r8
-                call            add_long_long
-                pop             rsi
-                pop             rdi
-
-                add             rbp, 8
-                add             rsi, 8
-                dec             rcx
-
-                jnz             .loop
-
-                pop             rbp
-                pop             rsi
                 pop             rcx
+                pop             rdi
 
-                add             rsp, 8 * 256
-                ret
+                ; r14 = 8 * rcx
+                push            r14
+                mov             r14, rcx
+                add             r14, r14
+                add             r14, r14
+                add             r14, r14
 
-; copies rcx qwords from rdi to r8
-copy:
-                push            rcx
+                ; iterator of #1
                 push            r8
-                push            rdi
-.loop:
-                mov             rbx, [rdi]
-                mov             [r8], rbx
-                add             r8, 8
-                add             rdi, 8
-                dec             rcx
-                jnz             .loop
+                mov             r8, 0
+.loop1:
+                ; carry
+                push            r11
+                mov             r11, 0
 
-                pop             rdi
-                pop             r8
-                pop             rcx
-                ret
-
-; adds two long number
-;    rdi -- address of summand #1 (long number)
-;    rsi -- address of summand #2 (long number)
-;    rcx -- length of long numbers in qwords
-; result:
-;    sum is written to rdi
-add_long_long:
+                ; iterator of #2
+                push            r9
+                mov             r9, 0
+.loop2:
                 push            rdi
                 push            rsi
-                push            rcx
+                push            rax
+                push            rdx
+                push            r10
+                push            r12
 
-                clc
-.loop:
-                mov             rax, [rsi]
-                lea             rsi, [rsi + 8]
-                adc             [rdi], rax
-                lea             rdi, [rdi + 8]
-                dec             rcx
-                jnz             .loop
+                mov             r10, rbp
+                add             r10, r8
+                add             r10, r9
 
-                pop             rcx
+                ; a[i] * b[j] + res[i + j] + carry;
+                add             rdi, r8
+                add             rsi, r9
+                mov             rax, [rdi]
+                mov             r12, [rsi]
+                mul             r12
+                add             rax, [r10]
+                adc             rdx, 0
+                add             rax, r11
+                adc             rdx, 0
+
+                ; update carry
+                mov             r11, rdx
+
+                ; res[i + j] = product
+                mov             [r10], rax
+
+                pop             r12
+                pop             r10
+                pop             rdx
+                pop             rax
                 pop             rsi
                 pop             rdi
+
+                lea             r9, [r9 + 8]
+                cmp             r9, r14
+                jnz             .loop2
+                pop             r9
+
+                ; res[i + #2.size()] = carry
+                push            r10
+                mov             r10, rbp
+                add             r10, r8
+                add             r10, r14
+                mov             [r10], r11
+                pop             r10
+
+                pop             r11
+
+                lea             r8, [r8 + 8]
+                cmp             r8, r14
+                jnz             .loop1
+                pop             r8
+
+                pop             r14
+
                 ret
 
 ; adds 64-bit number to long number
