@@ -10,14 +10,14 @@ _start:
                 mov             rdi, rsp
                 call            read_long
                 lea             rsi, [rsp + 256 * 8]
-                
+
                 sub             rsp, 256 * 8
                 mov             rbp, rsp
 
                 call            mul_long_long
-                
+
                 mov             rdi, rbp
-                
+
                 call            write_long
 
                 mov             al, 0x0a
@@ -40,19 +40,19 @@ mul_long_long:
 
                 sub             rsp, 256 * 8
                 mov             r8, rsp
-                
+
                 push            rcx
                 push            rsi
                 push            rbp
 .loop:
                 call            copy
-                
+
                 mov             rbx, [rsi]
                 push            rdi
                 mov             rdi, r8
                 call            mul_long_short
                 pop             rdi
-                
+
                 push            rdi
                 push            rsi
                 mov             rdi, rbp
@@ -60,17 +60,17 @@ mul_long_long:
                 call            add_long_long
                 pop             rsi
                 pop             rdi
-                
+
                 add             rbp, 8
                 add             rsi, 8
                 dec             rcx
-                
+
                 jnz             .loop
-                
+
                 pop             rbp
                 pop             rsi
                 pop             rcx
-                
+
                 add             rsp, 8 * 256
                 ret
 
@@ -86,7 +86,7 @@ copy:
                 add             rdi, 8
                 dec             rcx
                 jnz             .loop
-                
+
                 pop             rdi
                 pop             r8
                 pop             rcx
@@ -381,4 +381,3 @@ print_string:
 invalid_char_msg:
                 db              "Invalid character: "
 invalid_char_msg_size: equ             $ - invalid_char_msg
-
