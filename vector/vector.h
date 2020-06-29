@@ -185,10 +185,9 @@ size_t vector<T>::capacity() const {
 
 template<typename T>
 void vector<T>::reserve(size_t new_capacity) {
-  if (new_capacity <= capacity_) {
-    return;
+  if (new_capacity > capacity_) {
+    new_buffer(new_capacity);
   }
-  new_buffer(new_capacity);
 }
 
 template<typename T>
@@ -198,10 +197,9 @@ void vector<T>::shrink_to_fit() {
     data_ = nullptr;
     return;
   }
-  if (capacity_ == size_) {
-    return;
+  if (capacity_ > size_) {
+    new_buffer(size_);
   }
-  new_buffer(size_);
 }
 
 template<typename T>
@@ -289,7 +287,7 @@ void vector<T>::extend() {
 
 template<typename T>
 void vector<T>::new_buffer(size_t new_capacity) {
-  assert(new_capacity > size);
+  assert(new_capacity >= size_);
 
   T* tmp = create_new_buf(data_, size_, new_capacity);
 
