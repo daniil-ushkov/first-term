@@ -64,8 +64,8 @@ struct vector {
 
 template <typename T>
 void destroy_all(T* data, size_t size) {
-  for (ptrdiff_t i = size - 1; i >= 0; --i) {
-    data[i].~T();
+  for (size_t i = size; i > 0; --i) {
+    data[i - 1].~T();
   }
 }
 
@@ -237,22 +237,11 @@ typename vector<T>::const_iterator vector<T>::end() const {
 
 template<typename T>
 typename vector<T>::iterator vector<T>::insert(vector::const_iterator pos, const T & val) {
-  T copy = val;
-  vector<T> tmp;
-  if (size_ == capacity_) {
-    tmp.reserve(capacity_ == 0 ? 1 : 2 * capacity_);
-  } else {
-    tmp.reserve(capacity_);
-  }
   ptrdiff_t d = pos - begin();
-  for (iterator it = begin(); it != pos; ++it) {
-    tmp.push_back(*it);
+  push_back(val);
+  for (iterator it = end() - 1; it != begin() + d; --it) {
+    std::swap(*(it - 1), *it);
   }
-  tmp.push_back(copy);
-  for (iterator it = begin() + (pos - begin()) ; it != end(); ++it) {
-    tmp.push_back(*it);
-  }
-  swap(tmp);
   return begin() + d;
 }
 
@@ -264,18 +253,13 @@ typename vector<T>::iterator vector<T>::erase(vector::const_iterator pos) {
 template<typename T>
 typename vector<T>::iterator vector<T>::erase(vector::const_iterator first, vector::const_iterator last) {
   ptrdiff_t d = first - begin();
-  if (first == last) {
-    return begin() + d;
+  ptrdiff_t len = last - first;
+  for (iterator it = begin() + (last - begin()); it != end(); ++it) {
+    std::swap(*(it - len), *it);
   }
-  vector<T> tmp;
-  tmp.reserve(capacity_);
-  for (iterator it = begin(); it != first; ++it) {
-    tmp.push_back(*it);
+  for (;len != 0; --len) {
+    pop_back();
   }
-  for (iterator it = begin() + (last - begin()) ; it != end(); ++it) {
-    tmp.push_back(*it);
-  }
-  swap(tmp);
   return begin() + d;
 }
 
