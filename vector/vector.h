@@ -64,7 +64,7 @@ struct vector {
 
 template <typename T>
 void destroy_all(T* data, size_t size) {
-  for (size_t i = 0; i < size; ++i) {
+  for (ptrdiff_t i = size - 1; i >= 0; --i) {
     data[i].~T();
   }
 }
@@ -112,13 +112,11 @@ vector<T>::~vector() {
 
 template<typename T>
 T &vector<T>::operator[](size_t i) {
-  assert(i < size_);
   return data_[i];
 }
 
 template<typename T>
 T const &vector<T>::operator[](size_t i) const {
-  assert(i < size_);
   return data_[i];
 }
 
@@ -139,39 +137,38 @@ size_t vector<T>::size() const {
 
 template<typename T>
 T &vector<T>::front() {
-  assert(!empty());
   return data_[0];
 }
 
 template<typename T>
 T const &vector<T>::front() const {
-  assert(!empty());
   return data_[0];
 }
 
 template<typename T>
 T &vector<T>::back() {
-  assert(!empty());
   return data_[size_ - 1];
 }
 
 template<typename T>
 T const &vector<T>::back() const {
-  assert(!empty());
   return data_[size_ - 1];
 }
 
 template<typename T>
 void vector<T>::push_back(const T& val) {
-  T copy = val;
-  extend();
-  new(end()) T(copy);
+  if (size_ == capacity_) {
+    T copy = val;
+    extend();
+    new(end()) T(copy);
+  } else {
+    new(end()) T(val);
+  }
   ++size_;
 }
 
 template<typename T>
 void vector<T>::pop_back() {
-  assert(!empty());
   back().~T();
   --size_;
 }
@@ -242,9 +239,13 @@ typename vector<T>::const_iterator vector<T>::end() const {
 
 template<typename T>
 typename vector<T>::iterator vector<T>::insert(vector::const_iterator pos, const T & val) {
-  assert(pos <= end());
   T copy = val;
   vector<T> tmp;
+  if (size_ == capacity_) {
+    tmp.reserve(capacity_ == 0 ? 1 : 2 * capacity_);
+  } else {
+    tmp.reserve(capacity_);
+  }
   ptrdiff_t d = pos - begin();
   for (iterator it = begin(); it != pos; ++it) {
     tmp.push_back(*it);
@@ -264,12 +265,12 @@ typename vector<T>::iterator vector<T>::erase(vector::const_iterator pos) {
 
 template<typename T>
 typename vector<T>::iterator vector<T>::erase(vector::const_iterator first, vector::const_iterator last) {
-  assert(first <= last && last <= end());
   ptrdiff_t d = first - begin();
   if (first == last) {
     return begin() + d;
   }
   vector<T> tmp;
+  tmp.reserve(capacity_);
   for (iterator it = begin(); it != first; ++it) {
     tmp.push_back(*it);
   }
@@ -282,14 +283,15 @@ typename vector<T>::iterator vector<T>::erase(vector::const_iterator first, vect
 
 template<typename T>
 void vector<T>::extend() {
-  if (size_ == capacity_) {
-    new_buffer(capacity_ == 0 ? 1 : 2 * capacity_);
-  }
+  assert(size_ == capacity_);
+  new_buffer(capacity_ == 0 ? 1 : 2 * capacity_);
 }
 
 template<typename T>
 void vector<T>::new_buffer(size_t new_capacity) {
-  T* tmp = create_new_buf(data_, std::min(size_, new_capacity), new_capacity);
+  assert(new_capacity > size);
+
+  T* tmp = create_new_buf(data_, size_, new_capacity);
 
   std::swap(data_, tmp);
   capacity_ = new_capacity;
