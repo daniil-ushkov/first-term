@@ -45,22 +45,19 @@ mul_long_long:
 
                 ; r14 = 8 * rcx
                 push            r14
-                mov             r14, rcx
-                add             r14, r14
-                add             r14, r14
-                add             r14, r14
+                lea             r14, [8 * rcx]
 
                 ; iterator of #1
                 push            r8
-                mov             r8, 0
+                xor             r8, r8
 .loop1:
                 ; carry
                 push            r11
-                mov             r11, 0
+                xor             r11, r11
 
                 ; iterator of #2
                 push            r9
-                mov             r9, 0
+                xor             r9, r9
 .loop2:
                 push            rdi
                 push            rsi
