@@ -85,7 +85,7 @@ struct big_integer {
   void to_normal_form();
   void negate();
 
-  uint32_t trial(uint64_t const k, uint64_t const m, uint64_t const d2);
+  uint32_t trial(uint64_t const k, uint64_t const m, big_integer const &d);
   bool smaller(big_integer const &dq, uint64_t const k, uint64_t const m);
   void difference(big_integer const &dq, uint64_t const k, uint64_t const m);
 
