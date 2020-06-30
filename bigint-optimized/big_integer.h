@@ -1,7 +1,6 @@
 #ifndef BIG_INTEGER_H
 #define BIG_INTEGER_H
 
-#include "buffer.h"
 #include <vector>
 #include <cstdint>
 #include <algorithm>
@@ -19,11 +18,6 @@ struct big_integer {
   void swap(big_integer &other) noexcept;
 
   big_integer &operator=(big_integer const &other);
-
-  big_integer &add_short_(uint32_t val);
-  big_integer &mul_short_(uint32_t val);
-  uint32_t div_short_(uint32_t val);
-
 
   big_integer &operator+=(big_integer const &rhs);
   big_integer &operator-=(big_integer const &rhs);
@@ -51,7 +45,7 @@ struct big_integer {
   friend big_integer operator+(big_integer a, big_integer const &b);
   friend big_integer operator-(big_integer a, big_integer const &b);
   friend big_integer operator*(big_integer a, big_integer const &b);
-  friend big_integer operator/(big_integer a, big_integer b);
+  friend big_integer operator/(big_integer a, big_integer const &b);
   friend big_integer operator%(big_integer a, big_integer const &b);
 
   friend big_integer operator&(big_integer a, big_integer const &b);
@@ -72,22 +66,31 @@ struct big_integer {
 
  private:
   std::vector<uint32_t> value_;
-//  buffer value_;
   bool sign_;
+
+  big_integer &add_short_(uint32_t val);
+  big_integer &mul_short_(uint32_t val);
+  uint32_t div_short_(uint32_t val);
+
+  big_integer(bool sign, size_t size);
 
   size_t size() const noexcept;
 
+  bool full() const;
+  void reserve(size_t capacity);
+  big_integer reserved_copy();
+
+
   bool is_zero() const;
   void to_normal_form();
-
-  bool small_two_degree(big_integer &a) const;
+  void negate();
 
   uint32_t trial(uint64_t const k, uint64_t const m, uint64_t const d2);
   bool smaller(big_integer const &dq, uint64_t const k, uint64_t const m);
   void difference(big_integer const &dq, uint64_t const k, uint64_t const m);
 
-  big_integer &to_additional_code(size_t size);
-  static big_integer bitwise_op(uint32_t (*op)(uint32_t, uint32_t), big_integer a, big_integer b);
+  static void to_additional_code(size_t size, big_integer const& src, big_integer &dst);
+  big_integer& bitwise_op(uint32_t (*op)(uint32_t, uint32_t), big_integer const& rhs);
 
   static bool less_abs(big_integer const &a, big_integer const &b);
 };
@@ -95,7 +98,7 @@ struct big_integer {
 big_integer operator+(big_integer a, big_integer const &b);
 big_integer operator-(big_integer a, big_integer const &b);
 big_integer operator*(big_integer a, big_integer const &b);
-big_integer operator/(big_integer a, big_integer b);
+big_integer operator/(big_integer a, big_integer const &b);
 big_integer operator%(big_integer a, big_integer const &b);
 
 big_integer operator&(big_integer a, big_integer const &b);
