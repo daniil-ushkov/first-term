@@ -181,6 +181,7 @@ big_integer &big_integer::operator*=(big_integer const &rhs) {
 }
 
 // Division
+// algorithm from https://surface.syr.edu/cgi/viewcontent.cgi?referer=&httpsredir=1&article=1162&context=eecs_techreports
 
 uint128_t const BASE = static_cast<uint128_t>(UINT32_MAX) + 1;
 
@@ -192,7 +193,11 @@ uint32_t big_integer::trial(uint64_t const k, uint64_t const m, uint64_t const d
 bool big_integer::smaller(big_integer const &dq, uint64_t const k, uint64_t const m) {
   uint64_t i = m, j = 0;
   while (i != j) {
-    value_[i + k] == dq.value_[i] ? --i : j = i;
+    if (value_[i + k] != dq.value_[i]) {
+      j = i;
+    } else {
+      --i;
+    }
   }
   return value_[i + k] < dq.value_[i];
 }
