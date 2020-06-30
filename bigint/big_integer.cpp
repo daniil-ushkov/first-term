@@ -249,13 +249,13 @@ void big_integer::to_additional_code(size_t size, big_integer const& src, big_in
   if (src.sign_) {
     dst.sign_ = false;
     for (size_t i = 0; i < size; ++i) {
-      dst.value_[i] = ~src.value_[i];
+      dst.value_[i] = ~(i < src.size() ? src.value_[i] : 0);
     }
     dst += 1;
   } else {
     dst.sign_ = false;
     for (size_t i = 0; i < size; ++i) {
-      dst.value_[i] = src.value_[i];
+      dst.value_[i] = i < src.size() ? src.value_[i] : 0;
     }
   }
 }
