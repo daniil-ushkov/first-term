@@ -4,7 +4,7 @@
 
 big_integer::big_integer() : value_(1), sign_(false) {}
 
-big_integer::big_integer(big_integer const &other) : value_(other.value_), sign_(other.sign_) {}
+big_integer::big_integer(big_integer const &other) = default;
 
 big_integer::big_integer(int a) : value_(1), sign_(a < 0) {
   value_[0] = static_cast<uint32_t>(a < 0 ? -static_cast<int64_t>(a) : static_cast<int64_t>(a));
@@ -46,11 +46,11 @@ big_integer &big_integer::operator=(big_integer const &other) {
 //---------------------------------------------Short-arithmetic-operations----------------------------------------------
 
 big_integer &big_integer::add_short_(uint32_t val) {
-  big_integer res = reserved_copy();
+  big_integer res = *this;
   uint32_t carry = val;
-  for (uint32_t &word : res.value_) {
-    uint64_t tmp = static_cast<uint64_t>(word) + carry;
-    word = static_cast<uint32_t>(tmp);
+  for (size_t i = 0; i < res.size(); ++i) {
+    uint64_t tmp = static_cast<uint64_t>(res.value_[i]) + carry;
+    res.value_[i] = static_cast<uint32_t>(tmp);
     carry = static_cast<uint32_t>(tmp >> 32u);
     if (carry == 0) {
       break;
@@ -68,11 +68,11 @@ big_integer &big_integer::mul_short_(uint32_t val) {
   if (val == 0) {
     return *this = big_integer();
   }
-  big_integer res = reserved_copy();
+  big_integer res = *this;
   uint32_t carry = 0;
-  for (uint32_t &word : res.value_) {
-    uint64_t tmp = static_cast<uint64_t>(word) * val + carry;
-    word = static_cast<uint32_t>(tmp);
+  for (size_t i = 0; i < res.size(); ++i) {
+    uint64_t tmp = static_cast<uint64_t>(res.value_[i]) * val + carry;
+    res.value_[i] = static_cast<uint32_t>(tmp);
     carry = static_cast<uint32_t>(tmp >> 32u);
   }
   if (carry != 0) {
@@ -92,9 +92,9 @@ uint32_t big_integer::div_short_(uint32_t val) {
   }
   big_integer res = *this;
   uint32_t carry = 0;
-  for (auto it = res.value_.rbegin(); it != res.value_.rend(); ++it) {
-    uint64_t tmp = (static_cast<uint64_t>(carry) << 32u) + *it;
-    *it = tmp / val;
+  for (size_t i = res.size(); i > 0; --i) {
+    uint64_t tmp = (static_cast<uint64_t>(carry) << 32u) + res.value_[i - 1];
+    res.value_[i - 1] = tmp / val;
     carry = tmp % val;
   }
   res.to_normal_form();
@@ -111,16 +111,7 @@ big_integer &big_integer::operator+=(big_integer const &rhs) {
   if (sign_ != rhs.sign_) {
     return *this -= -rhs;
   }
-
-  big_integer const& bigger = size() > rhs.size() ? *this : rhs;
   big_integer res(sign_, 0);
-  // to avoid allocation from `push_back`
-  if (bigger.full()) {
-    res.reserve(2 * bigger.value_.capacity());
-  } else {
-    res.reserve(bigger.value_.capacity());
-  }
-
   value_.resize(std::max(size(), rhs.size()), 0);
   uint64_t sum, carry = 0;
   for (size_t i = 0; i < size(); ++i) {
@@ -181,18 +172,24 @@ big_integer &big_integer::operator*=(big_integer const &rhs) {
 }
 
 // Division
+// algorithm from https://surface.syr.edu/cgi/viewcontent.cgi?referer=&httpsredir=1&article=1162&context=eecs_techreports
 
 uint128_t const BASE = static_cast<uint128_t>(UINT32_MAX) + 1;
 
-uint32_t big_integer::trial(uint64_t const k, uint64_t const m, uint64_t const d2) {
+uint32_t big_integer::trial(uint64_t const k, uint64_t const m, big_integer const& d) {
   uint128_t r3 = (static_cast<uint128_t>(value_[k + m]) * BASE + value_[k + m - 1]) * BASE + value_[k + m - 2];
-  return static_cast<uint32_t>(std::min(r3 / d2, static_cast<uint128_t>(UINT32_MAX)));
+  uint64_t const d2 = (static_cast<uint64_t>(d.value_[m - 1]) << 32u) + d.value_[m - 2];
+  return static_cast<uint32_t>(std::min(r3 / d2, BASE - 1));
 }
 
 bool big_integer::smaller(big_integer const &dq, uint64_t const k, uint64_t const m) {
   uint64_t i = m, j = 0;
   while (i != j) {
-    value_[i + k] == dq.value_[i] ? --i : j = i;
+    if (value_[i + k] != dq.value_[i]) {
+      j = i;
+    } else {
+      --i;
+    }
   }
   return value_[i + k] < dq.value_[i];
 }
@@ -221,9 +218,8 @@ big_integer& big_integer::operator/=(big_integer const& rhs) {
   big_integer q(sign_ ^ rhs.sign_, n - m + 1), r = *this * f, d = rhs * f;
   r.sign_ = d.sign_ = false;
   r.value_.push_back(0);
-  uint64_t const d2 = (static_cast<uint64_t>(d.value_[m - 1]) << 32u) + d.value_[m - 2];
   for (ptrdiff_t k = n - m; k >= 0; --k) {
-    uint32_t qt = r.trial(static_cast<uint64_t>(k), m, d2);
+    uint32_t qt = r.trial(static_cast<uint64_t>(k), m, d);
     big_integer qt_mul = big_integer(static_cast<uint64_t>(qt));
     big_integer dq = qt_mul * d;
     dq.value_.resize(m + 1);
@@ -296,12 +292,11 @@ big_integer &big_integer::operator^=(big_integer const &rhs) {
 big_integer &big_integer::operator<<=(int shift) {
   big_integer res(sign_, 0);
   size_t d = static_cast<size_t>(shift / 32u);
-  res.value_.reserve(2u * (size() + d));
   for (size_t i = 0; i < d; ++i) {
     res.value_.push_back(0);
   }
-  for (uint32_t& word : value_) {
-    res.value_.push_back(word);
+  for (size_t i = 0; i < size(); ++i) {
+    res.value_.push_back(value_[i]);
   }
   res.mul_short_(1u << shift % 32u);
   return *this = res;
@@ -310,7 +305,6 @@ big_integer &big_integer::operator<<=(int shift) {
 big_integer &big_integer::operator>>=(int shift) {
   big_integer res(sign_, 0);
   size_t d = static_cast<size_t>(shift / 32u);
-  res.reserve(size() > d ? 2u * (size() - d) : 1);
   for (size_t i = d; i < size(); ++i) {
     res.value_.push_back(value_[i]);
   }
@@ -459,37 +453,16 @@ size_t big_integer::size() const noexcept {
   return value_.size();
 }
 
-bool big_integer::full() const {
-  return value_.size() == value_.capacity();
-}
-
-void big_integer::reserve(size_t capacity) {
-  value_.reserve(capacity);
-}
-
-// to avoid allocation from value_.push_back()
-big_integer big_integer::reserved_copy() {
-  big_integer res(sign_, 0);
-  if (full()) {
-    res.reserve(2 * value_.capacity());
-  } else {
-    res.reserve(value_.capacity());
-  }
-  for (uint32_t const &word : value_) {
-    res.value_.push_back(word);
-  }
-  return res;
-}
 
 bool big_integer::is_zero() const {
   return !sign_ && size() == 1 && value_[0] == 0;
 }
 
 void big_integer::to_normal_form() {
-  while (value_.back() == 0 && size() > 1) {
+  while (size() > 1 && value_.back() == 0) {
     value_.pop_back();
   }
-  if (value_.back() == 0 && size() == 1) {
+  if (size() == 1 && value_.back() == 0) {
     sign_ = false;
   }
 }
@@ -502,13 +475,11 @@ bool big_integer::less_abs(big_integer const &a, big_integer const &b) {
   if (a.size() != b.size()) {
     return a.size() < b.size();
   }
-  for (auto i = a.value_.rbegin(), j = b.value_.rbegin();
-       i != a.value_.rend() && j != b.value_.rend();
-       ++i, ++j) {
-    if (*i < *j) {
+  for (size_t i = a.size(), j = b.size(); i > 0 && j > 0; --i, --j){
+    if (a.value_[i - 1] < b.value_[j - 1]) {
       return true;
     }
-    if (*i > *j) {
+    if (a.value_[i - 1] > b.value_[j - 1]) {
       return false;
     }
   }
