@@ -1,6 +1,7 @@
 #ifndef BIG_INTEGER_H
 #define BIG_INTEGER_H
 
+#include "buffer.h"
 #include <vector>
 #include <cstdint>
 #include <algorithm>
@@ -65,7 +66,7 @@ struct big_integer {
   friend std::string to_string(big_integer const &a);
 
  private:
-  std::vector<uint32_t> value_;
+  buffer value_;
   bool sign_;
 
   big_integer &add_short_(uint32_t val);
@@ -76,16 +77,11 @@ struct big_integer {
 
   size_t size() const noexcept;
 
-  bool full() const;
-  void reserve(size_t capacity);
-  big_integer reserved_copy();
-
-
   bool is_zero() const;
   void to_normal_form();
   void negate();
 
-  uint32_t trial(uint64_t const k, uint64_t const m, uint64_t const d2);
+  uint32_t trial(uint64_t const k, uint64_t const m, big_integer const &d);
   bool smaller(big_integer const &dq, uint64_t const k, uint64_t const m);
   void difference(big_integer const &dq, uint64_t const k, uint64_t const m);
 
