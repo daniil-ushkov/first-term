@@ -78,7 +78,8 @@ struct big_integer {
 
   bool full() const;
   void reserve(size_t capacity);
-  big_integer reserved_copy();
+  big_integer& prepare_capacity(big_integer const& rhs);
+  big_integer& prepared_capacity_copy(big_integer const& rhs);
 
 
   bool is_zero() const;

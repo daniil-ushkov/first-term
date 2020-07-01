@@ -46,7 +46,8 @@ big_integer &big_integer::operator=(big_integer const &other) {
 //---------------------------------------------Short-arithmetic-operations----------------------------------------------
 
 big_integer &big_integer::add_short_(uint32_t val) {
-  big_integer res = reserved_copy();
+  big_integer res(sign_, 0);
+  res.prepared_capacity_copy(*this);
   uint32_t carry = val;
   for (size_t i = 0; i < res.size(); ++i) {
     uint64_t tmp = static_cast<uint64_t>(res.value_[i]) + carry;
@@ -68,7 +69,8 @@ big_integer &big_integer::mul_short_(uint32_t val) {
   if (val == 0) {
     return *this = big_integer();
   }
-  big_integer res = reserved_copy();
+  big_integer res(sign_, 0);
+  res.prepared_capacity_copy(*this);
   uint32_t carry = 0;
   for (size_t i = 0; i < res.size(); ++i) {
     uint64_t tmp = static_cast<uint64_t>(res.value_[i]) * val + carry;
@@ -111,17 +113,9 @@ big_integer &big_integer::operator+=(big_integer const &rhs) {
   if (sign_ != rhs.sign_) {
     return *this -= -rhs;
   }
-
   big_integer const& bigger = size() > rhs.size() ? *this : rhs;
   big_integer res(sign_, 0);
-  // to avoid allocation from `push_back`
-  if (bigger.full()) {
-    res.reserve(2 * bigger.value_.capacity());
-  } else {
-    res.reserve(bigger.value_.capacity());
-  }
-
-  value_.resize(std::max(size(), rhs.size()), 0);
+  res.prepare_capacity(bigger);
   uint64_t sum, carry = 0;
   for (size_t i = 0; i < size(); ++i) {
     sum = carry;
@@ -147,18 +141,21 @@ big_integer &big_integer::operator-=(big_integer const &rhs) {
   if (big_integer::less_abs(*this, rhs)) {
     big_integer res = big_integer(rhs) -= *this;
     res.negate();
-    return *this = res;
+    swap(res);
+    return *this;
   }
-  value_.resize(std::max(size(), rhs.size()), 0);
+  big_integer res(sign_, 0);
+  res.prepare_capacity(*this);
   uint32_t sub;
   bool borrow = false;
   for (size_t i = 0; i < size(); ++i) {
     sub = value_[i] - static_cast<uint32_t>(borrow);
     sub -= i < rhs.size() ? rhs.value_[i] : 0;
     borrow = i < rhs.size() ? value_[i] < rhs.value_[i] + static_cast<uint64_t>(borrow) : false;
-    value_[i] = sub;
+    res.value_.push_back(sub);
   }
-  to_normal_form();
+  res.to_normal_form();
+  swap(res);
   return *this;
 }
 
@@ -177,7 +174,8 @@ big_integer &big_integer::operator*=(big_integer const &rhs) {
     res.value_[i + rhs.size()] = carry;
   }
   res.to_normal_form();
-  return *this = res;
+  swap(res);
+  return *this;
 }
 
 // Division
@@ -251,14 +249,14 @@ big_integer &big_integer::operator%=(big_integer const &rhs) {
 
 void big_integer::to_additional_code(size_t size, big_integer const& src, big_integer &dst) {
   dst.value_.resize(size, 0);
-  if (src.sign_) {
-    dst.sign_ = false;
+  bool sign = src.sign_;
+  dst.sign_ = false;
+  if (sign) {
     for (size_t i = 0; i < size; ++i) {
       dst.value_[i] = ~(i < src.size() ? src.value_[i] : 0);
     }
     dst += 1;
   } else {
-    dst.sign_ = false;
     for (size_t i = 0; i < size; ++i) {
       dst.value_[i] = i < src.size() ? src.value_[i] : 0;
     }
@@ -281,7 +279,8 @@ big_integer& big_integer::bitwise_op(uint32_t (*op)(uint32_t, uint32_t), big_int
     a.negate();
   }
   a.to_normal_form();
-  return *this = a;
+  swap(a);
+  return *this;
 }
 
 big_integer &big_integer::operator&=(big_integer const &rhs) {
@@ -472,18 +471,22 @@ void big_integer::reserve(size_t capacity) {
     value_.reserve(capacity);
 }
 
-// to avoid allocation from value_.push_back()
-big_integer big_integer::reserved_copy() {
-  big_integer res(sign_, 0);
-  if (full()) {
-    res.reserve(2 * value_.capacity());
+big_integer& big_integer::prepare_capacity(big_integer const& rhs) {
+  if (rhs.full()) {
+    reserve(2 * rhs.value_.capacity());
   } else {
-    res.reserve(value_.capacity());
+    reserve(rhs.value_.capacity());
   }
-  for (size_t i = 0; i < size(); ++i) {
-    res.value_.push_back(value_[i]);
+  return *this;
+}
+
+// to avoid allocation from value_.push_back()
+big_integer& big_integer::prepared_capacity_copy(big_integer const& rhs) {
+  prepare_capacity(rhs);
+  for (size_t i = 0; i < rhs.size(); ++i) {
+    value_.push_back(rhs.value_[i]);
   }
-  return res;
+  return *this;
 }
 
 bool big_integer::is_zero() const {
@@ -517,6 +520,7 @@ bool big_integer::less_abs(big_integer const &a, big_integer const &b) {
   }
   return false;
 }
+
 
 std::ostream &operator<<(std::ostream &s, big_integer const &a) {
   return s << to_string(a);
