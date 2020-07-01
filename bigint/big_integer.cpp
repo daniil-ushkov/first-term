@@ -308,7 +308,8 @@ big_integer &big_integer::operator<<=(int shift) {
     res.value_.push_back(value_[i]);
   }
   res.mul_short_(1u << shift % 32u);
-  return *this = res;
+  swap(res);
+  return *this;
 }
 
 big_integer &big_integer::operator>>=(int shift) {
@@ -323,7 +324,8 @@ big_integer &big_integer::operator>>=(int shift) {
     res -= static_cast<uint64_t>(1ull << shift % 32u) - 1;
   }
   res.div_short_(1u << shift % 32u);
-  return *this = res;
+  swap(res);
+  return *this;
 }
 
 //--------------------------------------------------Unary-operations----------------------------------------------------
