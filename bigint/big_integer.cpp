@@ -238,7 +238,8 @@ big_integer& big_integer::operator/=(big_integer const& rhs) {
     r.difference(dq, static_cast<uint64_t>(k), m);
   }
   q.to_normal_form();
-  return *this = q;
+  swap(q);
+  return *this;
 }
 
 big_integer &big_integer::operator%=(big_integer const &rhs) {
