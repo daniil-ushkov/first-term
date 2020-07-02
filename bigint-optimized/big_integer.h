@@ -34,7 +34,7 @@ struct buffer {
   void push_back(uint32_t val);
   void pop_back();
   void clear();
-  void reserve(size_t new_capacity);
+//  void reserve(size_t new_capacity);
 
   size_t size() const;
 
