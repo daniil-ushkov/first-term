@@ -119,13 +119,13 @@ void buffer::clear() {
   resize(0);
 }
 
-void buffer::reserve(size_t new_capacity) {
-  if (small() && new_capacity > MAX_STATIC_SIZE) {
-    alloc_dynamic_data();
-  } else {
-    dynamic_data_->data_.reserve(new_capacity);
-  }
-}
+//void buffer::reserve(size_t new_capacity) {
+//  if (small() && new_capacity > MAX_STATIC_SIZE) {
+//    alloc_dynamic_data();
+//  } else {
+//    dynamic_data_->data_.reserve(new_capacity);
+//  }
+//}
 
 size_t buffer::size() const {
   return size_;
