@@ -1,5 +1,170 @@
 #include "big_integer.h"
 
+//========================================================BUFFER========================================================
+
+
+dynamic_buffer::dynamic_buffer(size_t size, uint32_t val)
+    : data_(size, val), ref_counter(1) {}
+dynamic_buffer::dynamic_buffer(dynamic_buffer const &other)
+    : data_(other.data_), ref_counter(1) {}
+dynamic_buffer::dynamic_buffer(uint32_t *static_data_, size_t size)
+    : data_(static_data_, static_data_ + size), ref_counter(1) {}
+
+buffer::buffer(size_t size, uint32_t val) : size_(size) {
+  if (size <= MAX_STATIC_SIZE) {
+    std::fill(static_data_, static_data_ + size_, val);
+  } else {
+    dynamic_data_ = new dynamic_buffer(size, val);
+  }
+}
+
+buffer::buffer(const buffer &other) {
+  size_ = other.size_;
+  dynamic_data_ = other.dynamic_data_;
+  if (!other.small()) {
+    dynamic_data_->ref_counter += 1;
+  }
+}
+
+buffer::~buffer() {
+  if (!small()) {
+    unshare();
+  }
+}
+
+uint32_t &buffer::operator[](size_t index) {
+  realloc_dynamic_data();
+  if (small()) {
+    return static_data_[index];
+  } else {
+    return dynamic_data_->data_[index];
+  }
+}
+
+uint32_t const &buffer::operator[](size_t index) const {
+  if (small()) {
+    return static_data_[index];
+  } else {
+    return dynamic_data_->data_[index];
+  }
+}
+
+uint32_t const& buffer::back() const {
+  return (*this)[size_ - 1];
+}
+
+void buffer::resize(size_t new_size, uint32_t val) {
+  realloc_dynamic_data();
+  if (size_ <= MAX_STATIC_SIZE && new_size <= MAX_STATIC_SIZE) {
+    if (size_ < new_size) {
+      std::fill(static_data_ + size_, static_data_ + new_size, val);
+    }
+  }
+  if (size_ > MAX_STATIC_SIZE && new_size <= MAX_STATIC_SIZE) {
+    uint32_t tmp[MAX_STATIC_SIZE];
+    std::copy(dynamic_data_->data_.begin(), dynamic_data_->data_.begin() + new_size, tmp);
+    unshare();
+    std::copy(tmp, tmp + new_size, static_data_);
+  }
+  if (size_ <= MAX_STATIC_SIZE && new_size > MAX_STATIC_SIZE) {
+    alloc_dynamic_data();
+    dynamic_data_->data_.resize(new_size, val);
+  }
+  if (size_ > MAX_STATIC_SIZE && new_size > MAX_STATIC_SIZE) {
+    realloc_dynamic_data();
+    dynamic_data_->data_.resize(new_size, val);
+  }
+  size_ = new_size;
+}
+
+buffer &buffer::operator=(buffer const &other) {
+  if (this == &other) {
+    return *this;
+  }
+  this->~buffer();
+  size_ = other.size_;
+  dynamic_data_ = other.dynamic_data_;
+  if (!other.small()) {
+    dynamic_data_->ref_counter += 1;
+  }
+  return *this;
+}
+
+bool buffer::operator==(buffer const &other) const {
+  if (small()) {
+    return size_ == other.size_ && std::equal(static_data_, static_data_ + size_, other.static_data_);
+  } else {
+    return !other.small() && dynamic_data_->data_ == other.dynamic_data_->data_;
+  }
+}
+
+void buffer::push_back(uint32_t val) {
+  realloc_dynamic_data();
+  if (size_ < MAX_STATIC_SIZE) {
+    static_data_[size_] = val;
+  } else {
+    if (size_ == MAX_STATIC_SIZE) {
+      alloc_dynamic_data();
+    }
+    dynamic_data_->data_.push_back(val);
+  }
+  ++size_;
+}
+
+void buffer::pop_back() {
+  resize(size_ - 1);
+}
+
+void buffer::clear() {
+  resize(0);
+}
+
+void buffer::reserve(size_t new_capacity) {
+  if (small() && new_capacity > MAX_STATIC_SIZE) {
+    alloc_dynamic_data();
+  } else {
+    dynamic_data_->data_.reserve(new_capacity);
+  }
+}
+
+size_t buffer::size() const {
+  return size_;
+}
+
+bool buffer::exclusive() const {
+  return small() || dynamic_data_->ref_counter == 1;
+}
+
+bool buffer::small() const {
+  return size_ <= MAX_STATIC_SIZE;
+}
+
+void buffer::unshare() {
+  if (!small()) {
+    if (dynamic_data_->ref_counter == 1) {
+      delete(dynamic_data_);
+    } else {
+      dynamic_data_->ref_counter -= 1;
+    }
+  }
+}
+
+void buffer::alloc_dynamic_data() {
+  dynamic_buffer* new_data = new dynamic_buffer(static_data_, size_);
+  dynamic_data_ = new_data;
+}
+
+void buffer::realloc_dynamic_data() {
+  if (!exclusive()) {
+    dynamic_buffer *new_data = new dynamic_buffer(*dynamic_data_);
+    unshare();
+    dynamic_data_ = new_data;
+  }
+}
+
+//==================================================BIG=INTEGER=========================================================
+
+
 //--------------------------------------------------Constructors--------------------------------------------------------
 
 big_integer::big_integer() : value_(1), sign_(false) {}
@@ -47,7 +212,7 @@ big_integer &big_integer::operator=(big_integer const &other) {
 
 big_integer &big_integer::add_short_abs_(uint32_t val) {
   big_integer res(sign_, 0);
-  res.value_.reserve(value_.size() + 1);
+//  res.value_.reserve(value_.size() + 1);
   uint32_t carry = val;
   for (size_t i = 0; i < size(); ++i) {
     uint64_t tmp = static_cast<uint64_t>(value_[i]) + carry;
@@ -67,7 +232,7 @@ big_integer &big_integer::mul_short_(uint32_t val) {
     return *this = big_integer();
   }
   big_integer res(sign_, 0);
-  res.value_.reserve(value_.size() + 1);
+//  res.value_.reserve(value_.size() + 1);
   uint32_t carry = 0;
   for (size_t i = 0; i < size(); ++i) {
     uint64_t tmp = static_cast<uint64_t>(value_[i]) * val + carry;
@@ -111,7 +276,7 @@ big_integer &big_integer::operator+=(big_integer const &rhs) {
     return *this -= -rhs;
   }
   big_integer res(sign_, 0);
-  res.value_.reserve(std::max(size(), rhs.size()) + 1);
+//  res.value_.reserve(std::max(size(), rhs.size()) + 1);
   uint64_t sum, carry = 0;
   for (size_t i = 0; i < size(); ++i) {
     sum = carry;
@@ -135,13 +300,11 @@ big_integer &big_integer::operator-=(big_integer const &rhs) {
     return *this += -rhs;
   }
   if (big_integer::less_abs(*this, rhs)) {
-    big_integer res = big_integer(rhs) -= *this;
-    res.negate();
-    swap(res);
+    swap((big_integer(rhs) -= *this).negate());
     return *this;
   }
   big_integer res(sign_, 0);
-  res.value_.reserve(std::max(size(), rhs.size()));
+//  res.value_.reserve(std::max(size(), rhs.size()));
   uint32_t sub;
   bool borrow = false;
   for (size_t i = 0; i < size(); ++i) {
@@ -179,7 +342,7 @@ big_integer &big_integer::operator*=(big_integer const &rhs) {
 
 uint128_t const BASE = static_cast<uint128_t>(UINT32_MAX) + 1;
 
-uint32_t big_integer::trial(uint64_t const k, uint64_t const m, big_integer const& d) {
+uint32_t big_integer::trial(uint64_t const k, uint64_t const m, big_integer const &d) {
   uint128_t r3 = (static_cast<uint128_t>(value_[k + m]) * BASE + value_[k + m - 1]) * BASE + value_[k + m - 2];
   uint64_t const d2 = (static_cast<uint64_t>(d.value_[m - 1]) << 32u) + d.value_[m - 2];
   return static_cast<uint32_t>(std::min(r3 / d2, BASE - 1));
@@ -206,7 +369,7 @@ void big_integer::difference(big_integer const &dq, uint64_t const k, uint64_t c
   }
 }
 
-big_integer& big_integer::operator/=(big_integer const& rhs) {
+big_integer &big_integer::operator/=(big_integer const &rhs) {
   if (rhs.is_zero()) {
     throw std::runtime_error("division by zero");
   } else if (size() < rhs.size()) {
@@ -244,7 +407,7 @@ big_integer &big_integer::operator%=(big_integer const &rhs) {
 
 // Bitwise operations
 
-void big_integer::to_additional_code(size_t size, big_integer const& src, big_integer &dst) {
+void big_integer::to_additional_code(size_t size, big_integer const &src, big_integer &dst) {
   dst.value_.resize(size, 0);
   if (src.sign_) {
     dst.sign_ = false;
@@ -260,7 +423,7 @@ void big_integer::to_additional_code(size_t size, big_integer const& src, big_in
   }
 }
 
-big_integer& big_integer::bitwise_op(uint32_t (*op)(uint32_t, uint32_t), big_integer const& rhs) {
+big_integer &big_integer::bitwise_op(uint32_t (*op)(uint32_t, uint32_t), big_integer const &rhs) {
   bool sign = op(sign_, rhs.sign_);
   size_t max_size = std::max(size(), rhs.size());
   big_integer a(sign_, 0);
@@ -389,10 +552,12 @@ big_integer operator&(big_integer a, big_integer const &b) {
 }
 
 big_integer operator|(big_integer a, big_integer const &b) {
-  return a |= b;}
+  return a |= b;
+}
 
 big_integer operator^(big_integer a, big_integer const &b) {
-  return a ^= b;}
+  return a ^= b;
+}
 
 // Shifts
 
@@ -460,29 +625,30 @@ size_t big_integer::size() const noexcept {
   return value_.size();
 }
 
-
 bool big_integer::is_zero() const {
   return !sign_ && size() == 1 && value_[0] == 0;
 }
 
-void big_integer::to_normal_form() {
+big_integer &big_integer::to_normal_form() {
   while (size() > 1 && value_.back() == 0) {
     value_.pop_back();
   }
   if (size() == 1 && value_.back() == 0) {
     sign_ = false;
   }
+  return *this;
 }
 
-void big_integer::negate() {
+big_integer &big_integer::negate() noexcept {
   sign_ = !sign_;
+  return *this;
 }
 
 bool big_integer::less_abs(big_integer const &a, big_integer const &b) {
   if (a.size() != b.size()) {
     return a.size() < b.size();
   }
-  for (size_t i = a.size(), j = b.size(); i > 0 && j > 0; --i, --j){
+  for (size_t i = a.size(), j = b.size(); i > 0 && j > 0; --i, --j) {
     if (a.value_[i - 1] < b.value_[j - 1]) {
       return true;
     }
