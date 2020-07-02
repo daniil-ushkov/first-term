@@ -66,10 +66,10 @@ struct big_integer {
   friend std::string to_string(big_integer const &a);
 
  private:
-  buffer value_;
+  std::vector<uint32_t> value_;
   bool sign_;
 
-  big_integer &add_short_(uint32_t val);
+  big_integer &add_short_abs_(uint32_t val);
   big_integer &mul_short_(uint32_t val);
   uint32_t div_short_(uint32_t val);
 

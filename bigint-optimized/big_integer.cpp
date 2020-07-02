@@ -23,7 +23,7 @@ big_integer::big_integer(std::string const &str) : big_integer() {
   size_t i = (str[0] == '-' || str[0] == '+' ? 1 : 0);
   while (i < str.length()) {
     this->mul_short_(10);
-    this->add_short_(str[i++] - '0');
+    this->add_short_abs_(str[i++] - '0');
   }
   sign_ = (str[0] == '-');
   to_normal_form();
@@ -45,16 +45,14 @@ big_integer &big_integer::operator=(big_integer const &other) {
 
 //---------------------------------------------Short-arithmetic-operations----------------------------------------------
 
-big_integer &big_integer::add_short_(uint32_t val) {
-  big_integer res = *this;
+big_integer &big_integer::add_short_abs_(uint32_t val) {
+  big_integer res(sign_, 0);
+  res.value_.reserve(value_.size() + 1);
   uint32_t carry = val;
-  for (size_t i = 0; i < res.size(); ++i) {
-    uint64_t tmp = static_cast<uint64_t>(res.value_[i]) + carry;
-    res.value_[i] = static_cast<uint32_t>(tmp);
+  for (size_t i = 0; i < size(); ++i) {
+    uint64_t tmp = static_cast<uint64_t>(value_[i]) + carry;
+    res.value_.push_back(static_cast<uint32_t>(tmp));
     carry = static_cast<uint32_t>(tmp >> 32u);
-    if (carry == 0) {
-      break;
-    }
   }
   if (carry != 0) {
     res.value_.push_back(carry);
@@ -68,11 +66,12 @@ big_integer &big_integer::mul_short_(uint32_t val) {
   if (val == 0) {
     return *this = big_integer();
   }
-  big_integer res = *this;
+  big_integer res(sign_, 0);
+  res.value_.reserve(value_.size() + 1);
   uint32_t carry = 0;
-  for (size_t i = 0; i < res.size(); ++i) {
-    uint64_t tmp = static_cast<uint64_t>(res.value_[i]) * val + carry;
-    res.value_[i] = static_cast<uint32_t>(tmp);
+  for (size_t i = 0; i < size(); ++i) {
+    uint64_t tmp = static_cast<uint64_t>(value_[i]) * val + carry;
+    res.value_.push_back(static_cast<uint32_t>(tmp));
     carry = static_cast<uint32_t>(tmp >> 32u);
   }
   if (carry != 0) {
@@ -112,7 +111,7 @@ big_integer &big_integer::operator+=(big_integer const &rhs) {
     return *this -= -rhs;
   }
   big_integer res(sign_, 0);
-  value_.resize(std::max(size(), rhs.size()), 0);
+  res.value_.reserve(std::max(size(), rhs.size()) + 1);
   uint64_t sum, carry = 0;
   for (size_t i = 0; i < size(); ++i) {
     sum = carry;
@@ -138,18 +137,21 @@ big_integer &big_integer::operator-=(big_integer const &rhs) {
   if (big_integer::less_abs(*this, rhs)) {
     big_integer res = big_integer(rhs) -= *this;
     res.negate();
-    return *this = res;
+    swap(res);
+    return *this;
   }
-  value_.resize(std::max(size(), rhs.size()), 0);
+  big_integer res(sign_, 0);
+  res.value_.reserve(std::max(size(), rhs.size()));
   uint32_t sub;
   bool borrow = false;
   for (size_t i = 0; i < size(); ++i) {
     sub = value_[i] - static_cast<uint32_t>(borrow);
     sub -= i < rhs.size() ? rhs.value_[i] : 0;
     borrow = i < rhs.size() ? value_[i] < rhs.value_[i] + static_cast<uint64_t>(borrow) : false;
-    value_[i] = sub;
+    res.value_.push_back(sub);
   }
-  to_normal_form();
+  res.to_normal_form();
+  swap(res);
   return *this;
 }
 
@@ -168,7 +170,8 @@ big_integer &big_integer::operator*=(big_integer const &rhs) {
     res.value_[i + rhs.size()] = carry;
   }
   res.to_normal_form();
-  return *this = res;
+  swap(res);
+  return *this;
 }
 
 // Division
@@ -231,7 +234,8 @@ big_integer& big_integer::operator/=(big_integer const& rhs) {
     r.difference(dq, static_cast<uint64_t>(k), m);
   }
   q.to_normal_form();
-  return *this = q;
+  swap(q);
+  return *this;
 }
 
 big_integer &big_integer::operator%=(big_integer const &rhs) {
@@ -272,7 +276,8 @@ big_integer& big_integer::bitwise_op(uint32_t (*op)(uint32_t, uint32_t), big_int
     a.negate();
   }
   a.to_normal_form();
-  return *this = a;
+  swap(a);
+  return *this;
 }
 
 big_integer &big_integer::operator&=(big_integer const &rhs) {
@@ -299,7 +304,8 @@ big_integer &big_integer::operator<<=(int shift) {
     res.value_.push_back(value_[i]);
   }
   res.mul_short_(1u << shift % 32u);
-  return *this = res;
+  swap(res);
+  return *this;
 }
 
 big_integer &big_integer::operator>>=(int shift) {
@@ -313,7 +319,8 @@ big_integer &big_integer::operator>>=(int shift) {
     res -= static_cast<uint64_t>(1ull << shift % 32u) - 1;
   }
   res.div_short_(1u << shift % 32u);
-  return *this = res;
+  swap(res);
+  return *this;
 }
 
 //--------------------------------------------------Unary-operations----------------------------------------------------
