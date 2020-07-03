@@ -7,8 +7,8 @@ dynamic_buffer::dynamic_buffer(dynamic_buffer const &other)
 dynamic_buffer::dynamic_buffer(uint32_t *static_data_, size_t size)
     : data_(static_data_, static_data_ + size), ref_counter(1) {}
 
-buffer::buffer(size_t size, uint32_t val) : size_(size) {
-  if (size <= MAX_STATIC_SIZE) {
+buffer::buffer(size_t size, uint32_t val) : size_(size), small_(size <= MAX_STATIC_SIZE) {
+  if (small_) {
     std::fill(static_data_, static_data_ + size_, val);
   } else {
     dynamic_data_ = new dynamic_buffer(size, val);
@@ -17,21 +17,22 @@ buffer::buffer(size_t size, uint32_t val) : size_(size) {
 
 buffer::buffer(const buffer &other) {
   size_ = other.size_;
+  small_ = other.small_;
   dynamic_data_ = other.dynamic_data_;
-  if (!other.small()) {
+  if (!other.small_) {
     dynamic_data_->ref_counter += 1;
   }
 }
 
 buffer::~buffer() {
-  if (!small()) {
+  if (!small_) {
     unshare();
   }
 }
 
 uint32_t &buffer::operator[](size_t index) {
   realloc_dynamic_data();
-  if (small()) {
+  if (small_) {
     return static_data_[index];
   } else {
     return dynamic_data_->data_[index];
@@ -39,7 +40,7 @@ uint32_t &buffer::operator[](size_t index) {
 }
 
 uint32_t const &buffer::operator[](size_t index) const {
-  if (small()) {
+  if (small_) {
     return static_data_[index];
   } else {
     return dynamic_data_->data_[index];
@@ -51,23 +52,16 @@ uint32_t const& buffer::back() const {
 }
 
 void buffer::resize(size_t new_size, uint32_t val) {
-  realloc_dynamic_data();
-  if (size_ <= MAX_STATIC_SIZE && new_size <= MAX_STATIC_SIZE) {
+  if (small_ && new_size <= MAX_STATIC_SIZE) {
     if (size_ < new_size) {
       std::fill(static_data_ + size_, static_data_ + new_size, val);
     }
   }
-  if (size_ > MAX_STATIC_SIZE && new_size <= MAX_STATIC_SIZE) {
-    uint32_t tmp[MAX_STATIC_SIZE];
-    std::copy(dynamic_data_->data_.begin(), dynamic_data_->data_.begin() + new_size, tmp);
-    unshare();
-    std::copy(tmp, tmp + new_size, static_data_);
-  }
-  if (size_ <= MAX_STATIC_SIZE && new_size > MAX_STATIC_SIZE) {
+  if (small_ && new_size > MAX_STATIC_SIZE) {
     alloc_dynamic_data();
     dynamic_data_->data_.resize(new_size, val);
   }
-  if (size_ > MAX_STATIC_SIZE && new_size > MAX_STATIC_SIZE) {
+  if (!small_) {
     realloc_dynamic_data();
     dynamic_data_->data_.resize(new_size, val);
   }
@@ -80,27 +74,34 @@ buffer &buffer::operator=(buffer const &other) {
   }
   this->~buffer();
   size_ = other.size_;
+  small_ = other.small_;
   dynamic_data_ = other.dynamic_data_;
-  if (!other.small()) {
+  if (!other.small_) {
     dynamic_data_->ref_counter += 1;
   }
   return *this;
 }
 
 bool buffer::operator==(buffer const &other) const {
-  if (small()) {
-    return size_ == other.size_ && std::equal(static_data_, static_data_ + size_, other.static_data_);
+  if (size_ != other.size_) {
+    return false;
+  } else if (small_ && other.small_) {
+    return std::equal(static_data_, static_data_ + size_, other.static_data_);
+  } else if (small_ && !other.small_) {
+    return std::equal(static_data_, static_data_ + size_, other.dynamic_data_->data_.begin());
+  } else if (!small_ && other.small_) {
+    return std::equal(other.static_data_, other.static_data_ + other.size_, dynamic_data_->data_.begin());
   } else {
-    return !other.small() && dynamic_data_->data_ == other.dynamic_data_->data_;
+    return dynamic_data_->data_ == other.dynamic_data_->data_;
   }
 }
 
 void buffer::push_back(uint32_t val) {
   realloc_dynamic_data();
-  if (size_ < MAX_STATIC_SIZE) {
+  if (small_ && size_ < MAX_STATIC_SIZE) {
     static_data_[size_] = val;
   } else {
-    if (size_ == MAX_STATIC_SIZE) {
+    if (small_ && size_ == MAX_STATIC_SIZE) {
       alloc_dynamic_data();
     }
     dynamic_data_->data_.push_back(val);
@@ -109,7 +110,10 @@ void buffer::push_back(uint32_t val) {
 }
 
 void buffer::pop_back() {
-  resize(size_ - 1);
+  if (!small_) {
+    dynamic_data_->data_.pop_back();
+  }
+  --size_;
 }
 
 void buffer::clear() {
@@ -129,15 +133,11 @@ size_t buffer::size() const {
 }
 
 bool buffer::exclusive() const {
-  return small() || dynamic_data_->ref_counter == 1;
-}
-
-bool buffer::small() const {
-  return size_ <= MAX_STATIC_SIZE;
+  return small_ || dynamic_data_->ref_counter == 1;
 }
 
 void buffer::unshare() {
-  if (!small()) {
+  if (!small_) {
     if (dynamic_data_->ref_counter == 1) {
       delete(dynamic_data_);
     } else {
@@ -149,6 +149,7 @@ void buffer::unshare() {
 void buffer::alloc_dynamic_data() {
   dynamic_buffer* new_data = new dynamic_buffer(static_data_, size_);
   dynamic_data_ = new_data;
+  small_ = false;
 }
 
 void buffer::realloc_dynamic_data() {
