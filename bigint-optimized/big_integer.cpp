@@ -47,7 +47,7 @@ big_integer &big_integer::operator=(big_integer const &other) {
 
 big_integer &big_integer::add_short_abs_(uint32_t val) {
   big_integer res(sign_, 0);
-//  res.value_.reserve(value_.size() + 1);
+  res.value_.reserve(value_.size() + 1);
   uint32_t carry = val;
   for (size_t i = 0; i < size(); ++i) {
     uint64_t tmp = static_cast<uint64_t>(value_[i]) + carry;
@@ -67,7 +67,7 @@ big_integer &big_integer::mul_short_(uint32_t val) {
     return *this = big_integer();
   }
   big_integer res(sign_, 0);
-//  res.value_.reserve(value_.size() + 1);
+  res.value_.reserve(value_.size() + 1);
   uint32_t carry = 0;
   for (size_t i = 0; i < size(); ++i) {
     uint64_t tmp = static_cast<uint64_t>(value_[i]) * val + carry;
@@ -111,7 +111,7 @@ big_integer &big_integer::operator+=(big_integer const &rhs) {
     return *this -= -rhs;
   }
   big_integer res(sign_, 0);
-//  res.value_.reserve(std::max(size(), rhs.size()) + 1);
+  res.value_.reserve(std::max(size(), rhs.size()) + 1);
   uint64_t sum, carry = 0;
   for (size_t i = 0; i < size(); ++i) {
     sum = carry;
@@ -139,7 +139,7 @@ big_integer &big_integer::operator-=(big_integer const &rhs) {
     return *this;
   }
   big_integer res(sign_, 0);
-//  res.value_.reserve(std::max(size(), rhs.size()));
+  res.value_.reserve(std::max(size(), rhs.size()));
   uint32_t sub;
   bool borrow = false;
   for (size_t i = 0; i < size(); ++i) {
