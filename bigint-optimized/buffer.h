@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cstring>
 #include <stdexcept>
+#include <cassert>
 
 struct dynamic_buffer {
   std::vector<uint32_t> data_;
@@ -37,7 +38,6 @@ struct buffer {
   size_t size() const;
 
   bool exclusive() const;
-  bool small() const ;
 
   bool operator==(buffer const& other) const;
 
@@ -49,6 +49,7 @@ struct buffer {
   static const size_t MAX_STATIC_SIZE = 2;
 
   size_t size_;
+  bool small_;
   union {
     dynamic_buffer* dynamic_data_;
     uint32_t static_data_[MAX_STATIC_SIZE];
