@@ -1,21 +1,9 @@
 #ifndef BIGINT_BIGINT_OPTIMIZED_BUFFER_H_
 #define BIGINT_BIGINT_OPTIMIZED_BUFFER_H_
 
-#include <vector>
 #include <cstdint>
 #include <algorithm>
-#include <cstring>
-#include <stdexcept>
-#include <cassert>
-
-struct dynamic_buffer {
-  std::vector<uint32_t> data_;
-  size_t ref_counter;
-
-  explicit dynamic_buffer(size_t size, uint32_t val = 0);
-  dynamic_buffer(dynamic_buffer const& other);
-  dynamic_buffer(uint32_t* static_data_, size_t size);
-};
+#include "dynamic_buffer.h"
 
 struct buffer {
   explicit buffer(size_t size, uint32_t val = 0);

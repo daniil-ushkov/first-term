@@ -1,12 +1,5 @@
 #include "buffer.h"
 
-dynamic_buffer::dynamic_buffer(size_t size, uint32_t val)
-    : data_(size, val), ref_counter(1) {}
-dynamic_buffer::dynamic_buffer(dynamic_buffer const &other)
-    : data_(other.data_), ref_counter(1) {}
-dynamic_buffer::dynamic_buffer(uint32_t *static_data_, size_t size)
-    : data_(static_data_, static_data_ + size), ref_counter(1) {}
-
 buffer::buffer(size_t size, uint32_t val) : size_(size), small_(size <= MAX_STATIC_SIZE) {
   if (small_) {
     std::fill(static_data_, static_data_ + size_, val);
@@ -110,6 +103,7 @@ void buffer::push_back(uint32_t val) {
 }
 
 void buffer::pop_back() {
+  realloc_dynamic_data();
   if (!small_) {
     dynamic_data_->data_.pop_back();
   }
@@ -121,8 +115,12 @@ void buffer::clear() {
 }
 
 void buffer::reserve(size_t new_capacity) {
-  if ((small_ && new_capacity > MAX_STATIC_SIZE) || !small_) {
+  if (small_ && new_capacity > MAX_STATIC_SIZE) {
     alloc_dynamic_data();
+    dynamic_data_->data_.reserve(new_capacity);
+  }
+  if (!small_) {
+    realloc_dynamic_data();
     dynamic_data_->data_.reserve(new_capacity);
   }
 }

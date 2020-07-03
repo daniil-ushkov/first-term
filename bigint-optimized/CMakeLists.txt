@@ -11,6 +11,8 @@ add_executable(big_integer_testing
                big_integer.cpp
                buffer.h
                buffer.cpp
+               dynamic_buffer.h
+               dynamic_buffer.cpp
                gtest/gtest-all.cc
                gtest/gtest.h
                gtest/gtest_main.cc 
