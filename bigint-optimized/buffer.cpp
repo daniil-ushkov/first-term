@@ -51,12 +51,10 @@ void buffer::resize(size_t new_size, uint32_t val) {
     }
   }
   if (small_ && new_size > MAX_STATIC_SIZE) {
-    alloc_dynamic_data();
-    dynamic_data_->data_.resize(new_size, val);
+    alloc_dynamic_data(new_size, val);
   }
   if (!small_) {
-    realloc_dynamic_data();
-    dynamic_data_->data_.resize(new_size, val);
+    realloc_dynamic_data(new_size, val);
   }
   size_ = new_size;
 }
@@ -140,6 +138,23 @@ void buffer::unshare() {
     } else {
       dynamic_data_->ref_counter -= 1;
     }
+  }
+}
+
+void buffer::alloc_dynamic_data(size_t size, uint32_t val) {
+  dynamic_buffer* new_data = new dynamic_buffer(size, val);
+  std::copy(static_data_, static_data_ + std::min(size_, size), new_data->data_.begin());
+  dynamic_data_ = new_data;
+  small_ = false;
+}
+
+void buffer::realloc_dynamic_data(size_t size, uint32_t val) {
+  if (!exclusive()) {
+    dynamic_buffer *new_data = new dynamic_buffer(size, val);
+    std::copy(dynamic_data_->data_.begin(),
+        dynamic_data_->data_.begin() + std::min(size_, size), new_data->data_.begin());
+    unshare();
+    dynamic_data_ = new_data;
   }
 }
 

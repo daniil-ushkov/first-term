@@ -31,6 +31,8 @@ struct buffer {
 
  private:
   void unshare();
+  void alloc_dynamic_data(size_t size, uint32_t val);
+  void realloc_dynamic_data(size_t size, uint32_t val);
   void alloc_dynamic_data();
   void realloc_dynamic_data();
 
