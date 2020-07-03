@@ -155,6 +155,8 @@ void buffer::realloc_dynamic_data(size_t size, uint32_t val) {
         dynamic_data_->data_.begin() + std::min(size_, size), new_data->data_.begin());
     unshare();
     dynamic_data_ = new_data;
+  } else {
+    dynamic_data_->data_.resize(size, val);
   }
 }
 
